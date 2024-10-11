@@ -1,0 +1,1992 @@
+---
+title: Treatment prescription patterns for SGLT2i, GLP1-RA, and DPP4i
+author: "Roemer J. Janse"
+date: " r Sys.Date()"
+output:
+  word_document:
+    toc: yes
+    toc_depth: 6
+  pdf_document:
+    toc: yes
+    toc_depth: 6
+  html_document:
+    toc: yes
+    toc_depth: 6
+header-includes:
+- \usepackage{subfig}
+- \usepackage{pdflscape}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+geometry: left=1.2cm,right=1,2cm,top=1,2cm,bottom=1,2cm
+---
+
+# 0. Set-up
+```{r setup, include=FALSE}
+# Set options
+knitr::opts_chunk$set(echo = FALSE, evaluate = TRUE, tidy = TRUE, cache = FALSE, autodep = TRUE, warning = FALSE, message = FALSE, dpi = 600,
+                      fig.width = 10, fig.height = 7)
+
+# Set table format
+options(knitr.table.format = 'markdown')
+
+# Load packages
+pacman::p_load("dplyr",      # Data manipulation
+               "knitr",      # Knitting .Rmd documents
+               "ggplot2",    # Data visualization
+               "broom",      # Converting data
+               "survival",   # Survival analyses
+               "tableone",   # Creating table one
+               "robustbase", # Robust estimation
+               "cowplot"     # Data viz. add-on
+)
+
+# Set working directionary
+setwd("C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Codes/SCREAM3/dataframes")
+
+# Clean working environment
+rm(list = ls())
+
+# Load data
+load("pop.Rdata")
+
+```
+
+# 1. Baseline characteristics
+```{r table one} 
+# Specify which variables in the dataset you want to include in the baseline table
+listvar <- c(
+    # General information
+    "age", "age_cat", "female", "lab_gfr", "lab_gfc", "lab_hbc", "lab_hcc", "lab_acr", "lab_acc",
+    # Comorbidities
+    "com_acv", "com_acs", "com_ihd", "com_str", "com_cbv", "com_pvd", "com_hfl", "com_hyp", "com_dmc", "com_vds",  "com_afb", 
+    "com_arr", "com_cpd", "com_old", "com_vte", "com_can", "com_lvd", "com_frc",
+    # Hospital admissions in previous year
+    "hca_hcv", "hca_hdm", "hca_hot",
+    # Outpatient contacts in previous year
+    "hca_ocv", "hca_odm", "hca_oot",
+    # Drugs for diabetes in previous 6 months
+    "med_add", "med_met", "med_sus", "med_glp", "med_sgl", "med_dpp", "med_ins", "med_oad", "fdd_cat",
+    # Concomitant medications
+    "med_bbs", "med_ccb", "med_dur", "med_ras", "med_sta", "med_dgx", "med_nit", "med_aps", "med_acs", "med_bai", "med_aci", "med_gci",
+    "med_gco", "med_nsd", "med_ops",
+    # No. of prescription drugs in previous year
+    "med_toc",
+    # Calendar year
+    "year",
+    # Socioeconomic characteristics
+    "ses_edu", "ses_fam", "ses_inc"
+)
+
+# Specify which variables are continuous
+continuous <- c("age", "lab_gfr", "lab_hbc", "lab_acr", "med_toc") 
+
+# Specify that all variables not continuous are categorical
+catvar <- listvar[!listvar %in% continuous]
+
+# Give labels to the variables
+labels <- c("Number of individuals",
+            "Age, mean (SD), y",
+            "Age group, n (%)", "<50 years", "50-59", "60-69", "70-79", ">= 80",
+            "Women, n (%)",
+            "eGFR, median (IQR), ml/min/1.73m2",
+            "eGFR category, n (%)", "G1", "G2", "G3a", "G3b", "G4", "G5", "Missing",
+            "HbA1c, median (IQR), mmol/mol",
+            "HbA1c category, n (%),", "<53 mmol/mol", "53-57", "58-63", "64-68", "69-74", ">=75", "Missing",
+            "ACR, median (IQR), mg/mmol",
+            "ACR category, n (%)", "A1 (<3 mg/mmol)", "A2 (3-30)", "A3 (>30)", "Missing",
+            "Atherosclerotic cardiovascular disease, composite of:",
+            "Acute coronary syndrome",
+            "Other ischemic heart disease",
+            "Stroke",
+            "Other cerebrovascular disease",
+            "Peripheral vascular disease",
+            "Heart failure",
+            "Hypertension",
+            "Diabetic complications",
+            "Valve disorders",
+            "Atrial fibrillation",
+            "Other arrhythmia",
+            "Chronic obstructive pulmonary disease",
+            "Other lung disease",
+            "Venous thromboembolism",
+            "Cancer in previous year",
+            "Liver disease",
+            "Fracture in previous year",
+            "Cardiovascular causes",
+            "Type 2 diabetes related causes",
+            "Non-cardiovascular/type 2 diabetes related causes",
+            "Cardiovascular causes",
+            "Type 2 diabetes related causes",
+            "Non-cardiovascular/type 2 diabetes related causes",
+            "Any",
+            "Metformin",
+            "Sulfonylureas",
+            "GLP1-RAs",
+            "SGLT2i",
+            "Dipeptidyl peptidase-4 inhibitor",
+            "Insulin",
+            "Other drugs for diabetes (glitazones, glinides, acarbose)",
+            "Time since first-ever diabetes drug, n (%)", "<1 year", "1-3 years", "3-5 years", "5-7 years", ">7 years",
+            "Beta blocker",
+            "Calcium channel blocker",
+            "Diuretic",
+            "ACEi/ARB",
+            "Lipid-lowering drug",
+            "Digoxin",
+            "Nitrate",
+            "Antiplatelet",
+            "Anticoagulant",
+            "Beta-2 agonist inhalant",
+            "Anticholinergic inhalant",
+            "Glucocorticoid inhalant",
+            "Oral glucocorticoid",
+            "NSAID",
+            "Opioid",
+            "No. of prescription drugs in previous year, n (%)", "0-5", "6-10", "11-15", ">15",
+            "Calendar year, n (%)", "2015", "2016", "2017", "2018", "2019", "2020",
+            "Education", "Compulsory school", "Secondary school", "University", "Missing",
+            "Living status", "Living alone", "Cohabitating", "Missing",
+            "Income", "Below stratum median", "Above stratum median", "Missing"
+)
+
+# Makes baseline table stratified by treatment level
+tab.str <- CreateTableOne(vars = listvar, data = pop, factorVars = catvar, smd = FALSE, strata = "drug")
+
+# Print stratified table
+tab.str <- print(tab.str, printToggle = FALSE, noSpaces = TRUE, catDigits = 1, contDigits = 1, pDigits = 3, 
+                 nonnormal = c("lab_gfr", "lab_hbc", "lab_acr"), smd = FALSE)
+
+# Makes overall table
+tab.ovr <- CreateTableOne(vars = listvar, data = pop %>% arrange(lopnr, dt_index) %>% distinct(lopnr, .keep_all = TRUE), 
+                          factorVars = catvar, smd = FALSE)
+
+# Print overall table
+tab.ovr <- print(tab.ovr, printToggle = FALSE, noSpaces = TRUE, catDigits = 1, contDigits = 1, pDigits = 3, 
+                 nonnormal = c("lab_gfr", "lab_hbc", "lab_acr"), smd = FALSE)
+
+# Keep only columns of interest and reorder
+tab.one <-
+    # Combine tables
+    cbind(# Table overall
+          as.matrix(tab.ovr[, 1]),
+          # Table stratified
+          as.matrix(tab.str[, c(3, 2, 1)])) %>%
+    # Change to data frame for some modifications
+    as.data.frame()
+
+# Add row numbers
+tab.one[, 5] <- 1:nrow(tab.one)
+
+# Make variable containing all variables with a proportion
+prop.rows <- c(4:9, 12:18, 21:27, 30:65, 67:86, 88:91, 93:98, 100:103, 105:107, 109:111)
+
+# Get proportions of those variables for each row and put back into data
+lapply(1:4, \(x){
+    # Get proportions
+    props <- tab.one[prop.rows, x] %>%
+    # Remove everything before proportion
+    gsub("\\d+ \\(", "", .) %>%
+    # Remove everything after proportion
+    gsub("\\)", "", .) %>%
+    # Change to numeric
+    as.numeric() %>%
+    # Round
+    round()
+
+    # Re-add count to proportions
+    vec.prop <- tab.one[prop.rows, x] %>%
+        # Remove proportions
+        gsub("\\(.+\\)", "", .) %>%
+        # Add rounded proportions
+        paste0(., "(", props, ")")
+    
+    # Add data to table
+    tab.one[prop.rows, x] <<- vec.prop
+})
+
+# Remove row numbers again and change to matrix
+tab.one <- tab.one %>%
+    # Remove row numbers
+    dplyr::select(-V5) %>%
+    # Change to matrix
+    as.matrix()
+
+# Add labels as rownames
+row.names(tab.one) <- labels
+
+# Add column names
+colnames(tab.one) <- c("Overall", "SGLT2i new-users", "GLP1-RA new-users", "DPP4i new-users")
+
+# Add commas for large numbers
+tab.one[, 1:4] <- prettyNum(tab.one[, 1:4], big.mark = ",")
+
+# Set missings to empty
+tab.one[, 1:4] <- ifelse(grepl("NA", tab.one[, 1:4]), "", tab.one[, 1:4])
+
+# Kable table one
+kable(tab.one)
+
+# remove objects
+rm(listvar, continuous, catvar, labels, tab.str)
+
+```
+
+# 2. Uptake of drugs over time
+```{r}
+# Create table
+dat.plot <- pop %>%
+    # Sort for grouping
+    arrange(drug, year) %>%
+    # Group on drug and year
+    group_by(drug, year) %>%
+    # Get total amount of people per year per drug
+    mutate(n = max(row_number())) %>%
+    # Keep one row per drug per year
+    slice(1L) %>%
+    # Ungroup again
+    ungroup() %>%
+    # Keep only relevant variabels
+    dplyr::select(drug, year, n) %>%
+    # Sort for grouping
+    arrange(drug) %>%
+    # Group on drug
+    group_by(drug) %>%
+    # Get cumulative count per drug per year
+    mutate(c = cumsum(n)) %>%
+    # Ungroup again
+    ungroup() %>%
+    # Change year to numeric
+    mutate(year = as.numeric(year)) %>%
+    # Rename drugs for plot
+    mutate(drug = case_when(drug == "sglt2i" ~ "SGLT2i",
+                            drug == "glp1" ~ "GLP1-RA",
+                            drug == "dpp4i" ~ "DPP4i"),
+           # Change drug to factor
+           drug = factor(drug, levels = c("DPP4i", "GLP1-RA", "SGLT2i")))
+
+# Create plot
+p <- ggplot(data = dat.plot, aes(x = year, y = c, colour = drug, linetype = drug, shape = drug)) +
+    # Geometries
+    geom_bar(inherit.aes = FALSE, aes(x = year, y= n, fill = drug), position = "dodge", stat = "identity", alpha = 0.5) +
+    geom_point() +
+    geom_line() +
+    # Scaling
+    scale_y_continuous(limits = c(0, 12000), breaks = seq(0, 12000, 2000), labels = prettyNum(seq(0, 12000, 2000), big.mark = ",")) +
+    scale_x_continuous(limits = c(2014, 2021), breaks = 2014:2021) +
+    scale_colour_manual(values = c("#0072B2", "#54EAC6", "#D55E00")) + 
+    scale_fill_manual(values = c("#0072B2", "#54EAC6", "#D55E00")) + 
+    scale_linetype_manual(values = c("solid", "dashed", "dotdash")) +
+    # Transformations
+    coord_cartesian(xlim = c(2014.5, 2020.5)) +
+    # Labels
+    ggtitle("Cumulative count of new-users over time", subtitle = "Lines show cumulative count, bars show individuals initiated per year") + 
+    xlab("Year") + ylab("Number of individuals") +
+    # Aesthetics
+    theme(panel.background = element_blank(),
+          panel.grid = element_blank(),
+          panel.grid.major.y = element_line(colour = "lightgrey", linetype = "dashed"),
+          plot.title = element_text(hjust = 0.5, face = "bold"),
+          plot.subtitle = element_text(hjust = 0.5, face = "italic"),
+          legend.position = "bottom",
+          legend.title = element_blank()) +
+    panel_border(colour = "black")
+          
+# Save plot
+ggsave("years.png", plot = p, path = "C:/Users/rjjanse/Onedrive - LUMC/Research/Projects/8. GDT_SGLT2i/figures/SCREAM3", dpi = 600, width = 6, height = 6)
+
+# Calculate relative percentages to previous year
+dat.plot %>%
+    # Sort for grouping (with SGLT2i at top)
+    arrange(desc(drug), year) %>%
+    # Group by drug
+    group_by(drug) %>%
+    # Create new variables
+    mutate(# Get n from previous year
+           nlag = lag(n),
+           # Get relative change from previous year
+           incr = round(((n - nlag) / nlag) * 100),
+           # Clean result
+           res = case_when(year == 2015 ~ "-",
+                           incr > 0 ~ paste0("Change compared to previous year: +", incr, "%"), 
+                           incr < 0 ~ paste0("Change compared to previous year: ", incr, "%"))) %>%
+    # Keep only relevant variables
+    dplyr::select(drug, year, n, res) %>%
+    # Rename columns
+    rename(Drug = 1, Year = 2, `Number of new users` = 3, Change = 4) %>%
+    # Kable table
+    kable()
+
+```
+
+# 3. 1 year & 60 day grace period
+## 3.1. Adherence and persistence
+### 3.1.1. Tables
+```{r}
+# Create function for univariable effect
+fun.uni <- function(df, type, drg){
+  # Keep only DPP4i (reference) and drug of interest
+  dat.model <- filter(df, drug == "dpp4i" | drug == drg)
+  
+  # Run logistic model for adherence
+  if(type == "adherence"){
+      # Run model
+      fit <- glmrob(pdc_ind ~ as.factor(drug), data = dat.model, family = binomial())
+      
+      # Calculate odds ratio and confidence interval
+      dat.lor <- 
+          # Change model fit into data frame
+          as.data.frame(summary(fit)[["coefficients"]]) %>% 
+          # Rename variables
+          rename(se = `Std. Error`, p = 4) %>% 
+          # Keep only drug of interest (second row)    
+          filter(row_number() == 2) %>%
+          # Create new variables
+          mutate(ll = exp(Estimate - (1.96 * se)),                                                         # Lower limit
+                 ul = exp(Estimate + (1.96 * se)),                                                         # Upper limit
+                 es = exp(Estimate),                                                                       # Odds ratio
+                 result = paste0(format(round(es, digits = 2), nsmall = 2, scientific = FALSE), " (",      # Format results nicely
+                                 format(round(ll, digits = 2), nsmall = 2, scientific = FALSE), "-",
+                                 format(round(ul, digits = 2), nsmall = 2, scientific = FALSE), ")"),
+                 p = ifelse(p < 0.001, "<0.001", format(round(p, 3), nsmall = 3))) %>%                     # Format P value nicely
+          # Keep only result
+          dplyr::select(result, p)
+  }
+  
+  # Run Cox model for persistence
+  if(type == "persistence"){
+      # Run model
+      fit <- coxph(Surv(time2gap, gap_ind) ~ as.factor(drug), data = dat.model, robust = TRUE)
+      
+      # Calculate hazard ratio and confidence interval
+      dat.lor <- 
+          # Bind data
+          cbind(
+              # Names of variables in model
+              rownames(as.data.frame(summary(fit)[["coefficients"]])),
+              # Coefficients in model
+              format(round(
+                  # Bind model information
+                  cbind(
+                      # Coefficients
+                      summary(fit)[["coefficients"]], 
+                      # Confidence interval
+                      exp(confint(fit))), 
+                  2), nsmall = 2)) %>% 
+          # Change to data frame
+          as.data.frame() %>%
+          # Keep only drug of interest (first row)
+          filter(row_number() == 1) %>% 
+          # Rename variables
+          rename(es = 3, p = 7, ll = 8, ul = 9) %>% 
+          # Calculate new variables
+          mutate(es = as.numeric(es),                                                                       # Hazard ratio 
+                 ll = as.numeric(ll),                                                                       # Lower limit
+                 ul = as.numeric(ul),                                                                       # Upper limit
+                 result = paste0(format(round(es, digits = 2), nsmall = 2, scientific = FALSE), " (",       # Format results nicely
+                                 format(round(ll, digits = 2), nsmall = 2, scientific = FALSE), "-",
+                                 format(round(ul, digits = 2), nsmall = 2, scientific = FALSE), ")"),
+                 p = ifelse(as.numeric(p) < 0.001, "<0.001",                                                # Format P value nicely
+                            format(round(as.numeric(p), 3), nsmall = 3))) %>%                      
+          # Keep only result
+          dplyr::select(result, p)
+  }
+  
+  # Return result
+  return(dat.lor)
+}
+
+### Function for multivariable effect measures
+fun.mul <- function(df, type, drg, addon){
+  # Keep only DPP4i (reference) and drug of interest
+  dat.model <- filter(df, drug == "dpp4i" | drug == drg)
+
+  # Run logistic model for adherence
+  if(type == "adherence"){
+      # Run model
+      fit <- glmrob(pdc_ind ~ as.factor(drug) + com_hfl + com_acs + com_ihd + com_hyp + com_str + com_cbv + com_pvd + com_dmc + com_vds + 
+                     com_arr + com_cpd + com_old + com_vte + com_can + com_lvd + com_frc + med_bbs + med_ccb + med_dur + med_ras + med_sta +
+                     med_dgx + med_nit + med_aps + med_acs + med_bai + med_aci + med_gci + med_gco + med_nsd + med_ops + med_add + med_met + 
+                     med_sus + med_ins + med_oad + fdd_yrs + fdd_cat + med_toc + hca_hcv + hca_hdm + hca_hot + hca_ocv + hca_odm + hca_oot + 
+                     ses_edu + ses_inc + ses_fam + year + lab_gfc + female + age + lab_hcc + med_glp + med_sgl + med_dpp + com_afb, 
+                    data = dat.model, 
+                 family = binomial())
+      
+      # Get list of variables adjusted for sorted from biggest to smallest coefficients to determine what variables played the biggest role in adjustment
+      dat.vars <- 
+          # Change model fit into data frame
+          as.data.frame(summary(fit)[["coefficients"]]) %>%
+          # Keep only covariates (not intercept and exposure)
+          filter(row_number() != 1 & row_number() != 2) %>%
+          # Keep only beta
+          dplyr::select(Estimate) %>%
+          # Add rownames as variable
+          mutate(var = rownames(.)) %>%
+          # Make variable names comprehensible
+          mutate(variable = case_when(var == "com_hfl" ~ "Heart failure",
+                                      var == "com_acs" ~ "Acute coronary syndrome",
+                                      var == "com_ihd" ~ "Other ischemic heart disease",
+                                      var == "com_hyp" ~ "Hypertension",
+                                      var == "com_str" ~ "Stroke",
+                                      var == "com_cbv" ~ "Other cerebrovascular disease",
+                                      var == "com_pvd" ~ "Peripheral vascular disease",
+                                      var == "com_dmc" ~ "Diabetes mellitus comlpications",
+                                      var == "com_vds" ~ "Valve disorders",
+                                      var == "com_afb" ~ "Atrial fibrillation",
+                                      var == "com_arr" ~ "Other arrhythmia",
+                                      var == "com_cpd" ~ "COPD",
+                                      var == "com_old" ~ "Other lung dusease",
+                                      var == "com_vte" ~ "Venous thromboembolism",
+                                      var == "com_can" ~ "Cancer",
+                                      var == "com_lvd" ~ "Liver disease",
+                                      var == "com_frc" ~ "Fracture",
+                                      var == "med_bbs" ~ "Beta blockers",
+                                      var == "med_ccb" ~ "Calcium channel blocker",
+                                      var == "med_dur" ~ "Diuretics",
+                                      var == "med_ras" ~ "RASi",
+                                      var == "med_sta" ~ "Statins",
+                                      var == "med_dgx" ~ "Digoxin",
+                                      var == "med_nit" ~ "Nitrate",
+                                      var == "med_aps" ~ "Antiplatelets",
+                                      var == "med_acs" ~ "Anticoagulants",
+                                      var == "med_bai" ~ "Beta-2 agonist inhalant",
+                                      var == "med_aci" ~ "Anticholinergic inhalant",
+                                      var == "med_gci" ~ "Glucocorticoid inhalant",
+                                      var == "med_gco" ~ "Glucocorticoid oral",
+                                      var == "med_nsd" ~ "NSAIDs",
+                                      var == "med_ops" ~ "Opioids",
+                                      var == "med_add" ~ "Any diabetes drug",
+                                      var == "med_met" ~ "Metformin",
+                                      var == "med_sus" ~ "Sulfonylureas",
+                                      var == "med_ins" ~ "Insulin",
+                                      var == "med_oad" ~ "Other antidiabetics",
+                                      var == "fdd_yrs" ~ "Time since first every diabetes drug",
+                                      var == "fdd_cat1-3" ~ "Time since first every diabetes drug 1-3 years",
+                                      var == "fdd_cat>=3-5" ~ "Time since first every diabetes drug 3-5 years",
+                                      var == "fdd_cat>=5-7" ~ "Time since first every diabetes drug 5-7 years",
+                                      var == "fdd_cat>=7" ~ "Time since first every diabetes drug more than 7 years",
+                                      var == "med_toc>5-<=10" ~ "No. of prescribed drugs in previous year 5-9",
+                                      var == "med_toc>10-<=15" ~ "No. of prescribed drugs in previous year 10-14",
+                                      var == "med_toc>15" ~ "No. of prescribed drugs in previous year >15",
+                                      var == "hca_hcv" ~ "Healthcare access hospitalization cardiovascular",
+                                      var == "hca_hdm" ~ "Helathcare access hospitalization diabetes mellitus",
+                                      var == "hca_hot" ~ "Healthcare access hospitalization other",
+                                      var == "hca_ocv" ~ "Healthcare access outpatient cardiovascular disease",
+                                      var == "hca_odm" ~ "Healthcare access outpatient diabetes melltius",
+                                      var == "hca_oot" ~ "Healthcare access outpatient other",
+                                      var == "ses_eduSecondary school" ~ "Education secondary school",
+                                      var == "ses_eduUniversity" ~ "Education university",
+                                      var == "ses_edumissing" ~ "Education missing",
+                                      var == "ses_incabove median" ~ "Income above stratum median",
+                                      var == "ses_incmissing" ~ "Income missing",
+                                      var == "ses_famCohabitating" ~ "Family status cohabitating",
+                                      var == "year2016" ~ "Year of initiation 2016",
+                                      var == "year2017" ~ "Year of initiation 2017",
+                                      var == "year2018" ~ "Year of initiation 2018",
+                                      var == "year2019" ~ "Year of initiation 2019",
+                                      var == "year2020" ~ "Year of initiation 2020",
+                                      var == "lab_gfc>=60-<90" ~ "eGFR >=60 - <90",
+                                      var == "lab_gfc>=45-<60" ~ "eGFR >=45 - <60",
+                                      var == "lab_gfc>=30-<45" ~ "eGFR >=30 - <45",
+                                      var == "lab_gfc>=15-<30" ~ "eGFR >=15 - <30",
+                                      var == "lab_gfc<15" ~ "eGFR <15",
+                                      var == "lab_gfcmissing" ~ "eGFR missing",
+                                      var == "female" ~ "Female",
+                                      var == "age" ~ "Age",
+                                      var == "lab_hcc>=53-<58" ~ "HbA1c >=53-<58",
+                                      var == "lab_hcc>=58-<64" ~ "HbA1c >=58-<64",
+                                      var == "lab_hcc>=64-<69" ~ "HbA1c >=64-<69",
+                                      var == "lab_hcc>=69-<75" ~ "HbA1c >=69-<75",
+                                      var == "lab_hcc>=75" ~ "HbA1c >=75",
+                                      var == "lab_hccmissing" ~ "HbA1c missing",
+                                      var == "med_glp" ~ "GLP1-RA",
+                                      var == "med_sgl" ~ "SGLT2i",
+                                      var == "med_dpp" ~ "DPP4i")) %>%
+          # Sort coefficient large to small
+          arrange(desc(Estimate)) %>%
+          # Remove var column
+          dplyr::select(-var) %>%
+          # Save table
+          writexl::write_xlsx(., path = paste0("C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Codes/SCREAM3/Results/adherence", addon, "_", drg, ".xlsx"))
+                                      
+      # Calculate odds ratio and confidence interval
+      dat.lor <- 
+          # Change model fit into data frame
+          as.data.frame(summary(fit)[["coefficients"]]) %>% 
+          # Rename variables
+          rename(se = `Std. Error`, p = 4) %>% 
+          # Keep only drug of interest (second row)    
+          filter(row_number() == 2) %>%
+          # Create new variables
+          mutate(ll = exp(Estimate - (1.96 * se)),                                                         # Lower limit
+                 ul = exp(Estimate + (1.96 * se)),                                                         # Upper limit
+                 es = exp(Estimate),                                                                       # Odds ratio
+                 result = paste0(format(round(es, digits = 2), nsmall = 2, scientific = FALSE), " (",      # Format results nicely
+                                 format(round(ll, digits = 2), nsmall = 2, scientific = FALSE), "-",
+                                 format(round(ul, digits = 2), nsmall = 2, scientific = FALSE), ")"),
+                 p = ifelse(p < 0.001, "<0.001", format(round(p, 3), nsmall = 3))) %>%                     # Format P value nicely
+          # Keep only result and p-value
+          dplyr::select(result, p)
+  }
+  
+  # Run Cox model for persistence
+  if(type == "persistence"){
+      # Run model
+      fit <- coxph(Surv(time2gap, gap_ind) ~ as.factor(drug) + com_hfl + com_acs + com_ihd + com_hyp + com_str + com_cbv + com_pvd + com_dmc + 
+                       com_vds + com_arr + com_cpd + com_old + com_vte + com_can + com_lvd + com_frc + med_bbs + med_ccb + med_dur + med_ras + 
+                       med_sta + med_dgx + med_nit + med_aps + med_acs + med_bai + med_aci + med_gci + med_gco + med_nsd + med_ops + med_add + 
+                       med_met + med_sus + med_ins + med_oad + fdd_yrs + fdd_cat + med_toc + hca_hcv + hca_hdm + hca_hot + hca_ocv + hca_odm + 
+                       hca_oot + ses_edu + ses_inc + ses_fam + year + lab_gfc + female + age + lab_hcc + med_glp + med_sgl + med_dpp + com_afb, 
+                   data = dat.model, robust = TRUE)
+      
+      # Get list of variables adjusted for sorted from biggest to smallest coefficients to determine what variables played the biggest role in adjustment
+      dat.vars <- 
+          # Change model fit into data frame
+          as.data.frame(summary(fit)[["coefficients"]]) %>%
+          # Keep only covariates (not intercept and exposure)
+          filter(row_number() != 1) %>%
+          # Keep only beta
+          dplyr::select(coef) %>%
+          # Add rownames as variable
+          mutate(var = rownames(.)) %>%
+          # Make variable names comprehensible
+          mutate(variable = case_when(var == "com_hfl" ~ "Heart failure",
+                                      var == "com_acs" ~ "Acute coronary syndrome",
+                                      var == "com_ihd" ~ "Other ischemic heart disease",
+                                      var == "com_hyp" ~ "Hypertension",
+                                      var == "com_str" ~ "Stroke",
+                                      var == "com_cbv" ~ "Other cerebrovascular disease",
+                                      var == "com_pvd" ~ "Peripheral vascular disease",
+                                      var == "com_dmc" ~ "Diabetes mellitus comlpications",
+                                      var == "com_vds" ~ "Valve disorders",
+                                      var == "com_afb" ~ "Atrial fibrillation",
+                                      var == "com_arr" ~ "Other arrhythmia",
+                                      var == "com_cpd" ~ "COPD",
+                                      var == "com_old" ~ "Other lung dusease",
+                                      var == "com_vte" ~ "Venous thromboembolism",
+                                      var == "com_can" ~ "Cancer",
+                                      var == "com_lvd" ~ "Liver disease",
+                                      var == "com_frc" ~ "Fracture",
+                                      var == "med_bbs" ~ "Beta blockers",
+                                      var == "med_ccb" ~ "Calcium channel blocker",
+                                      var == "med_dur" ~ "Diuretics",
+                                      var == "med_ras" ~ "RASi",
+                                      var == "med_sta" ~ "Statins",
+                                      var == "med_dgx" ~ "Digoxin",
+                                      var == "med_nit" ~ "Nitrate",
+                                      var == "med_aps" ~ "Antiplatelets",
+                                      var == "med_acs" ~ "Anticoagulants",
+                                      var == "med_bai" ~ "Beta-2 agonist inhalant",
+                                      var == "med_aci" ~ "Anticholinergic inhalant",
+                                      var == "med_gci" ~ "Glucocorticoid inhalant",
+                                      var == "med_gco" ~ "Glucocorticoid oral",
+                                      var == "med_nsd" ~ "NSAIDs",
+                                      var == "med_ops" ~ "Opioids",
+                                      var == "med_add" ~ "Any diabetes drug",
+                                      var == "med_met" ~ "Metformin",
+                                      var == "med_sus" ~ "Sulfonylureas",
+                                      var == "med_ins" ~ "Insulin",
+                                      var == "med_oad" ~ "Other antidiabetics",
+                                      var == "fdd_yrs" ~ "Time since first every diabetes drug",
+                                      var == "fdd_cat1-3" ~ "Time since first every diabetes drug 1-3 years",
+                                      var == "fdd_cat>=3-5" ~ "Time since first every diabetes drug 3-5 years",
+                                      var == "fdd_cat>=5-7" ~ "Time since first every diabetes drug 5-7 years",
+                                      var == "fdd_cat>=7" ~ "Time since first every diabetes drug more than 7 years",
+                                      var == "med_toc>5-<=10" ~ "No. of prescribed drugs in previous year 5-9",
+                                      var == "med_toc>10-<=15" ~ "No. of prescribed drugs in previous year 10-14",
+                                      var == "med_toc>15" ~ "No. of prescribed drugs in previous year >15",
+                                      var == "hca_hcv" ~ "Healthcare access hospitalization cardiovascular",
+                                      var == "hca_hdm" ~ "Helathcare access hospitalization diabetes mellitus",
+                                      var == "hca_hot" ~ "Healthcare access hospitalization other",
+                                      var == "hca_ocv" ~ "Healthcare access outpatient cardiovascular disease",
+                                      var == "hca_odm" ~ "Healthcare access outpatient diabetes melltius",
+                                      var == "hca_oot" ~ "Healthcare access outpatient other",
+                                      var == "ses_eduSecondary school" ~ "Education secondary school",
+                                      var == "ses_eduUniversity" ~ "Education university",
+                                      var == "ses_edumissing" ~ "Education missing",
+                                      var == "ses_incabove median" ~ "Income above stratum median",
+                                      var == "ses_incmissing" ~ "Income missing",
+                                      var == "ses_famCohabitating" ~ "Family status cohabitating",
+                                      var == "year2016" ~ "Year of initiation 2016",
+                                      var == "year2017" ~ "Year of initiation 2017",
+                                      var == "year2018" ~ "Year of initiation 2018",
+                                      var == "year2019" ~ "Year of initiation 2019",
+                                      var == "year2020" ~ "Year of initiation 2020",
+                                      var == "lab_gfc>=60-<90" ~ "eGFR >=60 - <90",
+                                      var == "lab_gfc>=45-<60" ~ "eGFR >=45 - <60",
+                                      var == "lab_gfc>=30-<45" ~ "eGFR >=30 - <45",
+                                      var == "lab_gfc>=15-<30" ~ "eGFR >=15 - <30",
+                                      var == "lab_gfc<15" ~ "eGFR <15",
+                                      var == "lab_gfcmissing" ~ "eGFR missing",
+                                      var == "female" ~ "Female",
+                                      var == "age" ~ "Age",
+                                      var == "lab_hcc>=53-<58" ~ "HbA1c >=53-<58",
+                                      var == "lab_hcc>=58-<64" ~ "HbA1c >=58-<64",
+                                      var == "lab_hcc>=64-<69" ~ "HbA1c >=64-<69",
+                                      var == "lab_hcc>=69-<75" ~ "HbA1c >=69-<75",
+                                      var == "lab_hcc>=75" ~ "HbA1c >=75",
+                                      var == "lab_hccmissing" ~ "HbA1c missing",
+                                      var == "med_glp" ~ "GLP1-RA",
+                                      var == "med_sgl" ~ "SGLT2i",
+                                      var == "med_dpp" ~ "DPP4i")) %>%
+          # Sort coefficient large to small
+          arrange(desc(coef)) %>%
+          # Remove var column
+          dplyr::select(-var)  %>%
+          # Save table
+          writexl::write_xlsx(., path = paste0("C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Codes/SCREAM3/Results/persistence", addon, "_", drg, ".xlsx"))
+      
+      # Calculate hazard ratio and confidence interval
+      dat.lor <- 
+          # Bind data
+          cbind(
+              # Names of variables in model
+              rownames(as.data.frame(summary(fit)[["coefficients"]])),
+              # Coefficients in model
+              format(round(
+                  # Bind model information
+                  cbind(
+                      # Coefficients
+                      summary(fit)[["coefficients"]], 
+                      # Confidence interval
+                      exp(confint(fit))), 
+                  2), nsmall = 2)) %>% 
+          # Change to data frame
+          as.data.frame() %>%
+          # Keep only drug of interest (first row)
+          filter(row_number() == 1) %>% 
+          # Rename variables
+          rename(es = 3, p = 7, ll = 8, ul = 9) %>% 
+          # Calculate new variables
+          mutate(es = as.numeric(es),                                                                       # Hazard ratio 
+                 ll = as.numeric(ll),                                                                       # Lower limit
+                 ul = as.numeric(ul),                                                                       # Upper limit
+                 p = as.numeric(p),                                                                         # P value
+                 result = paste0(format(round(es, digits = 2), nsmall = 2, scientific = FALSE), " (",       # Format results nicely
+                                 format(round(ll, digits = 2), nsmall = 2, scientific = FALSE), "-",
+                                 format(round(ul, digits = 2), nsmall = 2, scientific = FALSE), ")"),
+                 p = ifelse(p < 0.001, "<0.001", format(round(p, 3), nsmall = 3))) %>%                      # Format P value nicely
+          # Keep only result
+          dplyr::select(result, p)
+  }
+  
+  # Return result
+  return(dat.lor)
+}
+    
+# Create function for absolute risks
+ars <- function(df){
+    # Model
+    fit <- survfit(Surv(time2cif, as.factor(cif_ind), type = "mstate") ~ as.factor(drug), data = df)
+ 
+    # Main survival data
+    dat.fit <- fit %>% 
+        # Change fit list to dataframe
+        broom::tidy() %>%
+        # Keep only events
+        dplyr::filter(state == "1") %>%
+        # Select only relevant variables
+        dplyr::select(time, strata, estimate, conf.high, conf.low) %>%
+        # Create strata names
+        dplyr::mutate(strata = ifelse(strata == "as.factor(drug)=sglt2i", "SGLT2i", 
+                                  ifelse(strata == "as.factor(drug)=dpp4i", "DPP4i", "GLP1-RA"))) %>%
+        # Change time to years
+        dplyr::mutate(time = time / (365.25 / 12)) 
+    
+    # Get last estimate as absolute risk at 12 months
+    dat.fit <- dat.fit %>% arrange(strata, desc(estimate)) %>% group_by(strata) %>% slice(1L) %>% ungroup() %>%
+      mutate(ar = round(estimate * 100, digits = 1),
+             ll = round(conf.low * 100, digits = 1),
+             ul = round(conf.high * 100, digits = 1),
+             `Absolute risks (95% CI)` = paste0(format(ar, nsmall = 1), "% (",
+                                                format(ll, nsmall = 1), "-",
+                                                format(ul, nsmall = 1), ")")) %>% dplyr::select(strata, `Absolute risks (95% CI)`)
+    
+    return(dat.fit)
+}
+    
+# Create function for table
+fun.tab <- function(type, addon){
+    # Get data 
+    dat.tmp <- pop
+    
+    # Remove the addon for variables of interest
+    dat.tmp <- rename(dat.tmp, pdc = paste0("pdc_", addon), pdc_ind = paste0("pdc_ind_", addon), 
+                      gap_ind = paste0("gap_ind_", addon), time2gap = paste0("time2gap_", addon),
+                      cif_ind = paste0("cif_ind_", addon), time2cif = paste0("time2cif_", addon))
+    
+    # Keep only non missings for adherence
+    if(type == "adherence"){
+        # Remove missings
+        dat.tmp <- filter(dat.tmp, !is.na(pdc))
+    }
+    
+    # Keep only non-missings for persistence
+    if(type == "persistence"){
+        # Remove missings
+        dat.tmp <- filter(dat.tmp, !is.na(time2gap))
+    }
+    
+    ## Get total number for each drug
+    # SGLT2i
+    n.sglt2i <<- table(dat.tmp[["drug"]])[["sglt2i"]]
+    
+    # GLP1-RA
+    n.glp1 <<- table(dat.tmp[["drug"]])[["glp1"]]
+    
+    # DPP4i
+    n.dpp4i <<- table(dat.tmp[["drug"]])[["dpp4i"]]
+    
+    # Get event count for adherence
+    if(type == "adherence"){
+        # SGLT2i
+        e.sglt2i <<- table(filter(dat.tmp, drug == "sglt2i")[["pdc_ind"]])[["1"]]
+        
+        # GLP1-RA
+        e.glp1 <<- table(filter(dat.tmp, drug == "glp1")[["pdc_ind"]])[["1"]]
+        
+        # DPP4i
+        e.dpp4i <<- table(filter(dat.tmp, drug == "dpp4i")[["pdc_ind"]])[["1"]]
+    }
+    
+    # Get event count for persistence
+    if(type == "persistence"){
+        # SGLT2i
+        e.sglt2i <<- table(filter(dat.tmp, drug == "sglt2i")[["gap_ind"]])[["1"]]
+        
+        # GLP1-RA
+        e.glp1 <<- table(filter(dat.tmp, drug == "glp1")[["gap_ind"]])[["1"]]
+        
+        # DPP4i
+        e.dpp4i <<- table(filter(dat.tmp, drug == "dpp4i")[["gap_ind"]])[["1"]]
+    }
+    
+    ## Determine odds ratio (univariable)
+    # SGLT2i
+    uni.sglt2i <- fun.uni(dat.tmp, type, "sglt2i")
+    
+    # GLP1-RA
+    uni.glp1 <- fun.uni(dat.tmp, type, "glp1")
+    
+    # DPP4i (reference)
+    uni.dpp4i <- c("1 (Reference)", "")
+    
+    ## Determine odds ratio (multivariable)
+    # SGLT2i
+    mul.sglt2i <- fun.mul(dat.tmp, type, "sglt2i", addon)
+    
+    # GLP1-RA
+    mul.glp1 <- fun.mul(dat.tmp, type, "glp1", addon)
+    
+    # DPP4i
+    mul.dpp4i <- c("1 (Reference)", "")
+    
+    ## Calculate proportions and confidence intervals
+    # Create function
+    fun.prp <- function(drg){
+        # Get relevant variables
+        e <- get(paste0("e.", drg)); n <- get(paste0("n.", drg))
+        
+        # Get proportion
+        p <- e / n
+        
+        # Get standard error
+        se <- sqrt((p * (1 - p)) / n)
+        
+        # Get confidence interval
+        ll <- p - 1.96 * se; ul <- p + 1.96 * se
+        
+        # Format
+        res <- paste0(round(p * 100), " (", round(ll * 100), "-", round(ul * 100), ")")
+        
+        # Return result
+        return(res)
+    }
+    
+    # SGLT2i
+    p.sglt2i <- fun.prp("sglt2i")
+    
+    # GLP1-RA
+    p.glp1 <- fun.prp("glp1")
+    
+    # DPP4i
+    p.dpp4i <- fun.prp("dpp4i")
+    
+    # Combine data in data frame
+    tab <- data.frame(
+      drug = c("SGLT2i", "GLP1-RA", "DPP4i"),                                                               # Drug
+      n = c(n.sglt2i, n.glp1, n.dpp4i),                                                                     # Total number
+      e = c(e.sglt2i, e.glp1, e.dpp4i),                                                                     # Events
+      prop = c(p.sglt2i, p.glp1, p.dpp4i),                                                                  # Proportion of events
+      uni = c(uni.sglt2i[[1]], uni.glp1[[1]], uni.dpp4i[[1]]),                                              # Univariable effect measure
+      p_uni = c(uni.sglt2i[[2]], uni.glp1[[2]], uni.dpp4i[[2]]),                                            # P-value univariable analysis
+      mul = c(mul.sglt2i[[1]], mul.glp1[[1]], mul.dpp4i[[1]]),                                              # Multivariable effect measure
+      p_mul = c(mul.sglt2i[[2]], mul.glp1[[2]], mul.dpp4i[[2]])                                             # P-value mulvariable analysis
+    ) %>% 
+        # Add big marks to total number and events
+        mutate(n = prettyNum(n, big.mark = ","),  # Total number
+               e = prettyNum(e, big.mark = ","))  # Events
+      
+    # Define column names for table
+    colnames(tab) <- c("strata", "Number of individuals", ifelse(type == "persistence", "Non-persistence", "Low PDC"), "Percentage", 
+                       ifelse(type == "persistence", "Univariable HR (95% CI)", "Univariable OR (95% CI)"), "p-value univariable", 
+                       ifelse(type == "persistence", "Multivariable HR (95% CI)", "Multivariable OR (95% CI)"), "p-value multivariable")
+    
+    # Add absolute risks for persistence
+    if(type == "persistence") tab <- left_join(tab, ars(dat.tmp), "strata")
+    
+    # Remove first column name
+    colnames(tab)[1] <- ""
+    
+    # Return table
+    return(tab)
+}
+
+## Adherence
+# Create table
+tab.adh <- fun.tab("adherence", "y1gp60")
+
+# Kable table
+kable(tab.adh, caption = "Adherence in the first 12 months")              
+
+## Persistence
+# Create table
+tab.per <- fun.tab("persistence", "y1gp60")
+
+# Kable table
+kable(tab.per, caption = "Persistence in the first 12 months")              
+
+```
+
+### 3.1.2. Cumulative incidence function
+```{r}
+# Create function for cumulative incidence function
+fun.cif <- function(addon, tl, ymin, zoom = TRUE){
+    # Get data 
+    dat.tmp <- pop
+    
+    # Remove the addon for variables of interest
+    dat.tmp <- rename(dat.tmp, cif_ind = paste0("cif_ind_", addon), time2cif = paste0("time2cif_", addon))
+    
+    # Fit model
+    fit <- survfit(Surv(time2cif, cif_ind, type = "mstate") ~ as.factor(drug), data = dat.tmp)
+        
+    ## Main survival data
+    dat.temp <- fit %>% 
+        # Change fit list to dataframe
+        broom::tidy() %>%
+        # Keep only events
+        dplyr::filter(state == "1") %>%
+        # Select only relevant variables
+        dplyr::select(time, strata, estimate, conf.high, conf.low) %>%
+        # Create strata names
+        dplyr::mutate(strata = ifelse(strata == "as.factor(drug)=sglt2i", "SGLT2i", 
+                                      ifelse(strata == "as.factor(drug)=dpp4i", "DPP4i", "GLP1-RA"))) %>%
+        # Change time to months
+        dplyr::mutate(time = time / (365.25 / 12)) 
+        
+    ## Get sequence of x-axis
+    # Determine years of follow-up
+    yrs <- ifelse(is.na(as.numeric(gsub("y", "", gsub("gp\\d{2}", "", addon)))), 7, as.numeric(gsub("y", "", gsub("gp\\d{2}", "", addon))))
+    
+    # Determine the steps of the sequence
+    bys <- ifelse(yrs == 7, 6, yrs) 
+    
+    # Get sequence for x axis
+    xseq <- seq(0, 12 * yrs, by = bys)
+
+    # Create preliminary dataset with numbers at risk
+    dat.fit2 <- fit %>%
+        # Change fit2 list to dataframe
+        broom::tidy() %>%
+        # Get states with numbers at risk
+        dplyr::filter(state == "(s0)") %>%
+        # Change time to months
+        dplyr::mutate(time = time / (365.25 / 12)) %>%
+        # Create strata names
+        dplyr::mutate(strata = ifelse(strata == "as.factor(drug)=sglt2i", "SGLT2i", 
+                                      ifelse(strata == "as.factor(drug)=dpp4i", "DPP4i", "GLP1-RA"))) %>%
+        # Keep only variables of interest
+        dplyr::select(time, n.risk, strata)
+    
+    # For loop to get closest number at risk to each timepoint on the x axis
+    for(i in xseq){
+        # Create data
+        ph <- dat.fit2 %>%
+            # Calculate difference of timepoint (i) - time. 
+            dplyr::mutate(diff = i - time) %>%
+            # Keep only relevant timepoints (positive number: before timepoint)
+            dplyr::filter(diff >= 0) %>%
+            # Sort on diff ascending and keep only timepoint closest
+            dplyr::arrange(strata, diff) %>% dplyr::group_by(strata) %>% dplyr::slice(1L) %>% dplyr::ungroup() %>%
+            # Round up time
+            dplyr::mutate(time = ceiling(time)) 
+        
+        # If first iteration, create new data        
+        if(i == xseq[[1]]){
+            # Create new data
+            dat.tab <- ph
+        }
+            
+        # If not first iteration, add to previous data    
+        else{
+            # Add to previous data
+            dat.tab <- rbind(dat.tab, ph)
+        }
+    }
+            
+    # Clean up after for loop
+    rm(i, ph, dat.fit2)
+            
+    # Get time 0 numbers
+    time.0 <- 
+        # Rowbind values
+        rbind(
+            # Column bound indicator and number at risk for SGLT2i
+            cbind("SGLT2i", table(dat.tmp[["drug"]])[["sglt2i"]]), 
+            # Column bound indicator and number at risk for GLP1-RA
+            cbind("GLP1-RA", table(dat.tmp[["drug"]])[["glp1"]]),
+            # Column bound indicator and number at risk for DPP4i
+            cbind("DPP4i", table(dat.tmp[["drug"]])[["dpp4i"]])) %>%
+        # Change to data frame
+        as.data.frame() %>%
+        # Rename variables 
+        dplyr::rename(strata = V1, n.risk = V2) %>% 
+        # Add time 0
+        dplyr::mutate(time = 0, diff = 0) 
+            
+    # Finalize data
+    dat.tab <- rbind(time.0, dat.tab) %>%
+        # Arrange to tidy data
+        dplyr::arrange(strata, time) %>%
+        # Drop diff variable
+        dplyr::select(-diff) %>%
+        # Add commas to big numbers
+        dplyr::mutate(n.risk = formatC(as.numeric(n.risk), format = "d", big.mark = ","))
+    
+    # Define theme for plot
+    theme_min <- function(){
+        theme(panel.background = element_blank(),
+              panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(),
+              axis.line.x.bottom = element_line(colour = "black", size = 0.5),
+              axis.line.y.left = element_line(colour = "black", size = 0.5),
+              plot.title = element_text(margin = margin(0, 0, 0, 0), face = "bold", size = 12, hjust = 0.5),
+              legend.position = c(0.01, 1),
+              legend.margin = margin(0, 0, 0, 0),
+              legend.justification = c("left", "top"),
+              legend.title = element_blank())
+        }
+        
+    # Create main plot
+    plot <- ggplot(data = dat.temp, aes(x = time, y = estimate, group = strata)) +
+        # Geometries
+        geom_step(aes(colour = strata, linetype = strata), size = 0.35) +
+        pammtools::geom_stepribbon(aes(fill = strata, ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+        # Scalings
+        scale_colour_manual(values = c("#0072B2", "#54EAC6", "#D55E00")) + 
+        scale_fill_manual(values = c("#0072B2", "#54EAC6", "#D55E00")) + 
+        scale_linetype_manual(values = c("solid", "dashed", "dotdash")) +
+        scale_y_continuous(breaks = seq(0, 1, 0.2), limits = c(0, 1)) +
+        scale_x_continuous(breaks = xseq, limits = c(xseq[1], xseq[length(xseq)])) +
+        # Labels
+        labs(title = tl) + xlab("Time (months)") + ylab("Absolute risk of non-persistence") +
+        # Aesthetics
+        theme_min()
+    
+    if(zoom){
+        # Create zoomed in plot
+        zoom.plot <- ggplot(data = dat.temp, aes(x = time, y = estimate, group = strata)) +
+            # Geometries
+            geom_step(aes(colour = strata, linetype = strata), size = 0.35) +
+            pammtools::geom_stepribbon(aes(fill = strata, ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+            # Scaling
+            scale_colour_manual(values = c("#0072B2", "#54EAC6", "#D55E00")) + scale_fill_manual(values = c("#0072B2", "#54EAC6", "#D55E00")) +
+            scale_linetype_manual(values = c("solid", "dashed", "dotdash")) +
+            scale_y_continuous(breaks = seq(0, ymin + 0.05, 0.1), limits = c(0, ymin)) +
+            scale_x_continuous(breaks = xseq, limits = c(xseq[1], xseq[length(xseq)])) +
+            # Labels
+            xlab("") + ylab("") +
+            # Aesthetics
+            theme_min() +
+            theme(legend.position = "none",
+                  plot.title = element_blank())
+    
+        # Add zoomed plot to main plot
+        plot <- plot + annotation_custom(grob = ggplotGrob(zoom.plot), xmin = xseq[[3]], xmax = xseq[[length(xseq)]],
+                                         ymin = ymin, ymax = 1)
+    }
+    
+    # Creating numbers at risk
+    table.plot <- ggplot(data = dat.tab, aes(x = time, y = strata)) +
+        # Geometries
+        annotate("text", x = dat.tab[["time"]], y = dat.tab[["strata"]], label = dat.tab[["n.risk"]]) +        
+        # Labs
+        labs(title = "At risk") +
+        # Aesthetics
+        theme(plot.title = element_text(margin = margin(0, 0, 0, 0), face = "bold", size = 12, hjust = 0.01),
+              axis.ticks.x = element_blank(),
+              axis.title.x = element_blank(),
+              axis.text.x = element_blank(),
+              axis.ticks.y = element_blank(),
+              axis.title.y = element_blank(),
+              axis.text.y = element_text(face = "bold", size = 12, colour = "black"),
+              panel.background = element_blank(),
+              panel.grid = element_blank())
+    
+    # Combine plot and numbers at risk
+    plot <- cowplot::plot_grid(plotlist = list(plot, table.plot), align = "hv", axis = "tblr", ncol = 1, rel_heights = c(3, 1))
+    
+    # Return plot
+    return(plot)
+}
+
+# Create plot
+ggsave("cif_y1gp60.jpg", plot = fun.cif("y1gp60", "Non-persistence within 12 months after initiation", 0.35), 
+       path = "C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3/", width = 9, height = 5, dpi = 600)
+
+```
+
+### 3.1.3. Adherence histograms
+```{r} 
+# Create function for histograms
+fun.his <- function(addon, tl){
+    # Get data
+    dat.tmp <- pop
+    
+    # Remove the addon for variables of interest
+    dat.tmp <- rename(dat.tmp, pdc_ind = paste0("pdc_ind_", addon), pdc = paste0("pdc_", addon))
+    
+    # Create plot
+    p <- ggplot(data = dat.tmp, aes(x = pdc)) +
+        # Geometries
+        geom_histogram(binwidth = 2, fill = "#0072B2", colour = "#0072B2") +
+        # Mutations
+        facet_grid(cols = vars(factor(drug, levels = c("sglt2i", "glp1", "dpp4i"))), labeller = 
+                       as_labeller(c("sglt2i" = "SGLT2i", "glp1" = "GLP1-RA", "dpp4i" = "DPP4i"))) +
+        # Scalings
+        scale_y_continuous(expand = c(0, 0), limits = c(0, 4000)) +
+        scale_x_continuous(limits = c(0, 101), breaks = seq(0, 100, 10), labels = seq(0, 100, 10)) +
+        # Labels
+        ggtitle(tl) + xlab("Proportion of days covered (%)") + ylab("Count") +
+        # Aesthetics
+        theme(panel.grid = element_blank(),
+              panel.background = element_blank(),
+              plot.title = element_text(hjust = 0.5, face = "bold"),
+              strip.background = element_rect(colour = "black")) +
+        panel_border(colour = "black", size = 0.5)
+    
+    # Return plot
+    return(p)
+}
+
+# Create and save plot
+ggsave("his_y1gp60.jpg", plot = fun.his("y1gp60", "Proportion of days covered within 12 months after initiation"), 
+       path = "C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3/", width = 9, height = 5, dpi = 600)
+
+```
+
+## 3.2. Restarting
+```{r}
+# Create function for univariable effect
+fun.uni.res <- function(df, drg){
+  # Keep only DPP4i (reference) and drug of interest
+  dat.model <- filter(df, drug == "dpp4i" | drug == drg)
+
+  # Run model
+  fit <- glmrob(res_ind ~ as.factor(drug), data = dat.model, family = binomial())
+  
+  # Calculate odds ratio and confidence interval
+  dat.lor <- 
+      # Change model fit into data frame
+      as.data.frame(summary(fit)[["coefficients"]]) %>% 
+      # Rename variables
+      rename(se = `Std. Error`, p = 4) %>% 
+      # Keep only drug of interest (second row)    
+      filter(row_number() == 2) %>%
+      # Create new variables
+      mutate(ll = exp(Estimate - (1.96 * se)),                                                         # Lower limit
+             ul = exp(Estimate + (1.96 * se)),                                                         # Upper limit
+             es = exp(Estimate),                                                                       # Odds ratio
+             result = paste0(format(round(es, digits = 2), nsmall = 2, scientific = FALSE), " (",      # Format results nicely
+                             format(round(ll, digits = 2), nsmall = 2, scientific = FALSE), "-",
+                             format(round(ul, digits = 2), nsmall = 2, scientific = FALSE), ")"),
+             p = ifelse(p < 0.001, "<0.001", format(round(p, 3), nsmall = 3))) %>%                     # Format p-value nicely 
+      # Keep only result
+      dplyr::select(result, p)
+ 
+  # Return result
+  return(dat.lor)
+}
+
+# Function for multivariable effect measures
+fun.mul.res <- function(df, drg, addon){
+  # Keep only DPP4i (reference) and drug of interest
+  dat.model <- filter(df, drug == "dpp4i" | drug == drg)
+
+  # Run model
+  fit <- glm(res_ind ~ as.factor(drug) + com_hfl + com_acs + com_ihd + com_hyp + com_str + com_cbv + com_pvd + com_dmc + com_vds + 
+                 com_arr + com_cpd + com_old + com_vte + com_can + com_lvd + com_frc + med_bbs + med_ccb + med_dur + med_ras + med_sta +
+                 med_dgx + med_nit + med_aps + med_acs + med_bai + med_aci + med_gci + med_gco + med_nsd + med_ops + med_add + med_met + 
+                 med_sus + med_ins + med_oad + fdd_yrs + fdd_cat + med_toc + hca_hcv + hca_hdm + hca_hot + hca_ocv + hca_odm + hca_oot + 
+                 ses_edu + ses_inc + ses_fam + year + lab_gfc + female + age + lab_hcc + med_glp + med_sgl + med_dpp + com_afb, 
+             data = dat.model, 
+             family = binomial())
+ 
+  # Get list of variables adjusted for sorted from biggest to smallest coefficients to determine what variables played the biggest role in adjustment
+  dat.vars <- 
+      # Change model fit into data frame
+      as.data.frame(summary(fit)[["coefficients"]]) %>%
+      # Keep only covariates (not intercept and exposure)
+      filter(row_number() != 1 & row_number() != 2) %>%
+      # Keep only beta
+      dplyr::select(Estimate) %>%
+      # Add rownames as variable
+      mutate(var = rownames(.)) %>%
+      # Make variable names comprehensible
+      mutate(variable = case_when(var == "com_hfl" ~ "Heart failure",
+                                  var == "com_acs" ~ "Acute coronary syndrome",
+                                  var == "com_ihd" ~ "Other ischemic heart disease",
+                                  var == "com_hyp" ~ "Hypertension",
+                                  var == "com_str" ~ "Stroke",
+                                  var == "com_cbv" ~ "Other cerebrovascular disease",
+                                  var == "com_pvd" ~ "Peripheral vascular disease",
+                                  var == "com_dmc" ~ "Diabetes mellitus comlpications",
+                                  var == "com_vds" ~ "Valve disorders",
+                                  var == "com_afb" ~ "Atrial fibrillation",
+                                  var == "com_arr" ~ "Other arrhythmia",
+                                  var == "com_cpd" ~ "COPD",
+                                  var == "com_old" ~ "Other lung dusease",
+                                  var == "com_vte" ~ "Venous thromboembolism",
+                                  var == "com_can" ~ "Cancer",
+                                  var == "com_lvd" ~ "Liver disease",
+                                  var == "com_frc" ~ "Fracture",
+                                  var == "med_bbs" ~ "Beta blockers",
+                                  var == "med_ccb" ~ "Calcium channel blocker",
+                                  var == "med_dur" ~ "Diuretics",
+                                  var == "med_ras" ~ "RASi",
+                                  var == "med_sta" ~ "Statins",
+                                  var == "med_dgx" ~ "Digoxin",
+                                  var == "med_nit" ~ "Nitrate",
+                                  var == "med_aps" ~ "Antiplatelets",
+                                  var == "med_acs" ~ "Anticoagulants",
+                                  var == "med_bai" ~ "Beta-2 agonist inhalant",
+                                  var == "med_aci" ~ "Anticholinergic inhalant",
+                                  var == "med_gci" ~ "Glucocorticoid inhalant",
+                                  var == "med_gco" ~ "Glucocorticoid oral",
+                                  var == "med_nsd" ~ "NSAIDs",
+                                  var == "med_ops" ~ "Opioids",
+                                  var == "med_add" ~ "Any diabetes drug",
+                                  var == "med_met" ~ "Metformin",
+                                  var == "med_sus" ~ "Sulfonylureas",
+                                  var == "med_ins" ~ "Insulin",
+                                  var == "med_oad" ~ "Other antidiabetics",
+                                  var == "fdd_yrs" ~ "Time since first every diabetes drug",
+                                  var == "fdd_cat1-3" ~ "Time since first every diabetes drug 1-3 years",
+                                  var == "fdd_cat>=3-5" ~ "Time since first every diabetes drug 3-5 years",
+                                  var == "fdd_cat>=5-7" ~ "Time since first every diabetes drug 5-7 years",
+                                  var == "fdd_cat>=7" ~ "Time since first every diabetes drug more than 7 years",
+                                  var == "med_toc>5-<=10" ~ "No. of prescribed drugs in previous year 5-9",
+                                  var == "med_toc>10-<=15" ~ "No. of prescribed drugs in previous year 10-14",
+                                  var == "med_toc>15" ~ "No. of prescribed drugs in previous year >15",
+                                  var == "hca_hcv" ~ "Healthcare access hospitalization cardiovascular",
+                                  var == "hca_hdm" ~ "Helathcare access hospitalization diabetes mellitus",
+                                  var == "hca_hot" ~ "Healthcare access hospitalization other",
+                                  var == "hca_ocv" ~ "Healthcare access outpatient cardiovascular disease",
+                                  var == "hca_odm" ~ "Healthcare access outpatient diabetes melltius",
+                                  var == "hca_oot" ~ "Healthcare access outpatient other",
+                                  var == "ses_eduSecondary school" ~ "Education secondary school",
+                                  var == "ses_eduUniversity" ~ "Education university",
+                                  var == "ses_edumissing" ~ "Education missing",
+                                  var == "ses_incabove median" ~ "Income above stratum median",
+                                  var == "ses_incmissing" ~ "Income missing",
+                                  var == "ses_famCohabitating" ~ "Family status cohabitating",
+                                  var == "year2016" ~ "Year of initiation 2016",
+                                  var == "year2017" ~ "Year of initiation 2017",
+                                  var == "year2018" ~ "Year of initiation 2018",
+                                  var == "year2019" ~ "Year of initiation 2019",
+                                  var == "year2020" ~ "Year of initiation 2020",
+                                  var == "lab_gfc>=60-<90" ~ "eGFR >=60 - <90",
+                                  var == "lab_gfc>=45-<60" ~ "eGFR >=45 - <60",
+                                  var == "lab_gfc>=30-<45" ~ "eGFR >=30 - <45",
+                                  var == "lab_gfc>=15-<30" ~ "eGFR >=15 - <30",
+                                  var == "lab_gfc<15" ~ "eGFR <15",
+                                  var == "lab_gfcmissing" ~ "eGFR missing",
+                                  var == "female" ~ "Female",
+                                  var == "age" ~ "Age",
+                                  var == "lab_hcc>=53-<58" ~ "HbA1c >=53-<58",
+                                  var == "lab_hcc>=58-<64" ~ "HbA1c >=58-<64",
+                                  var == "lab_hcc>=64-<69" ~ "HbA1c >=64-<69",
+                                  var == "lab_hcc>=69-<75" ~ "HbA1c >=69-<75",
+                                  var == "lab_hcc>=75" ~ "HbA1c >=75",
+                                  var == "lab_hccmissing" ~ "HbA1c missing",
+                                  var == "med_glp" ~ "GLP1-RA",
+                                  var == "med_sgl" ~ "SGLT2i",
+                                  var == "med_dpp" ~ "DPP4i")) %>%
+      # Sort coefficient large to small
+      arrange(desc(Estimate)) %>%
+      # Remove var column
+      dplyr::select(-var) %>%
+      # Save table
+      writexl::write_xlsx(., path = paste0("C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Codes/SCREAM3/Results/restarting", addon, "_", drg, ".xlsx"))
+ 
+  # Calculate odds ratio and confidence interval
+  dat.lor <- 
+      # Change model fit into data frame
+      as.data.frame(summary(fit)[["coefficients"]]) %>% 
+      # Rename variables
+      rename(se = `Std. Error`, p = 4) %>% 
+      # Keep only drug of interest (second row)    
+      filter(row_number() == 2) %>%
+      # Create new variables
+      mutate(ll = exp(Estimate - (1.96 * se)),                                                         # Lower limit
+             ul = exp(Estimate + (1.96 * se)),                                                         # Upper limit
+             es = exp(Estimate),                                                                       # Odds ratio
+             result = paste0(format(round(es, digits = 2), nsmall = 2, scientific = FALSE), " (",      # Format results nicely
+                             format(round(ll, digits = 2), nsmall = 2, scientific = FALSE), "-",
+                             format(round(ul, digits = 2), nsmall = 2, scientific = FALSE), ")"),
+             p = ifelse(p < 0.001, "<0.001", format(round(p, 3), nsmall = 3))) %>%                     # Format p-value nicely 
+      # Keep only result
+      dplyr::select(result, p)
+  
+  # Return result
+  return(dat.lor)
+}
+ 
+# Create function for table
+fun.tab.res <- function(addon){
+    # Get data 
+    dat.tmp <- pop
+    
+    # Remove the addon for variables of interest
+    dat.tmp <- rename(dat.tmp, res_ind = paste0("res_ind_", addon))
+    
+    # Remove missings
+    dat.tmp <- filter(dat.tmp, !is.na(res_ind))
+   
+    ## Get total number for each drug
+    # SGLT2i
+    n.sglt2i <<- table(dat.tmp[["drug"]])[["sglt2i"]]
+    
+    # GLP1-RA
+    n.glp1 <<- table(dat.tmp[["drug"]])[["glp1"]]
+    
+    # DPP4i
+    n.dpp4i <<- table(dat.tmp[["drug"]])[["dpp4i"]]
+    
+    ## Get events for each drug
+    # SGLT2i
+    e.sglt2i <<- table(filter(dat.tmp, drug == "sglt2i")[["res_ind"]])[["1"]]
+    
+    # GLP1-RA
+    e.glp1 <<- table(filter(dat.tmp, drug == "glp1")[["res_ind"]])[["1"]]
+    
+    # DPP4i
+    e.dpp4i <<- table(filter(dat.tmp, drug == "dpp4i")[["res_ind"]])[["1"]]
+    
+    ## Determine odds ratio (univariable)
+    # SGLT2i
+    uni.sglt2i <- fun.uni.res(dat.tmp, "sglt2i")
+    
+    # GLP1-RA
+    uni.glp1 <- fun.uni.res(dat.tmp, "glp1")
+    
+    # DPP4i (reference)
+    uni.dpp4i <- c("1 (Reference)", "")
+    
+    ## Determine odds ratio (multivariable)
+    # SGLT2i
+    mul.sglt2i <- fun.mul.res(dat.tmp, "sglt2i", addon)
+    
+    # GLP1-RA
+    mul.glp1 <- fun.mul.res(dat.tmp, "glp1", addon)
+    
+    # DPP4i
+    mul.dpp4i <- c("1 (Reference)", "")
+    
+    # Create function
+    fun.prp <- function(drg){
+        # Get relevant variables
+        e <- get(paste0("e.", drg)); n <- get(paste0("n.", drg))
+        
+        # Get proportion
+        p <- e / n
+        
+        # Get standard error
+        se <- sqrt((p * (1 - p)) / n)
+        
+        # Get confidence interval
+        ll <- p - 1.96 * se; ul <- p + 1.96 * se
+        
+        # Format
+        res <- paste0(round(p * 100), " (", round(ll * 100), "-", round(ul * 100), ")")
+        
+        # Return result
+        return(res)
+    }
+    
+    # SGLT2i
+    p.sglt2i <- fun.prp("sglt2i")
+    
+    # GLP1-RA
+    p.glp1 <- fun.prp("glp1")
+    
+    # DPP4i
+    p.dpp4i <- fun.prp("dpp4i")
+    
+    ## Combine data in data frame
+    tab <- data.frame(
+      drug = c("SGLT2i", "GLP1-RA", "DPP4i"),                                                               # Drug
+      n = c(n.sglt2i, n.glp1, n.dpp4i),                                                                     # Total number
+      e = c(e.sglt2i, e.glp1, e.dpp4i),                                                                     # Events
+      prop = c(p.sglt2i, p.glp1, p.dpp4i),                                                                  # Proportion of events
+      uni = c(uni.sglt2i[[1]], uni.glp1[[1]], uni.dpp4i[[1]]),                                              # Univariable effect measure
+      p_uni = c(uni.sglt2i[[2]], uni.glp1[[2]], uni.dpp4i[[2]]),                                             # P-value for univariable analyses
+      mul = c(mul.sglt2i[[1]], mul.glp1[[1]], mul.dpp4i[[1]]),                                              # Multivariable effect measure
+      p_mul = c(mul.sglt2i[[2]], mul.glp1[[2]], mul.dpp4i[[2]])                                             # P-value for multivariable analyses
+    ) %>% 
+        # Add big marks to total number and events
+        mutate(n = prettyNum(n, big.mark = ","),  # Total number
+               e = prettyNum(e, big.mark = ","))  # Events
+      
+    # Define column names for table
+    colnames(tab) <- c("strata", "Number of individuals", "Restart", "Percentage", "Univariable OR (95% CI)", "p-value univairable",
+                       "Multivariable OR (95% CI)", "p-value multivariable")
+    
+    # Remove second column name
+    colnames(tab)[1] <- ""
+    
+    # Return table
+    return(tab)
+}
+
+# Create table
+tab.adh <- fun.tab.res("y1gp60")
+
+# Kable table
+kable(tab.adh, caption = "Restarting within 3 months after non-persistence")              
+
+```
+
+## 3.3. Prognostic factors
+```{r}
+# Function for logistic model for adherence
+fun.log.prd <- function(df, drg, var){
+    # Define formula
+    form <- paste0("pdc_ind ~ ", var)
+    
+    # Get data
+    dat.model <- df
+
+    # Fit logistic model
+    fit <- glmrob(as.formula(form), data = dat.model, family = binomial())
+    
+    # Calculate odds ratio and confidence interval
+    dat.lor <- 
+        # Bind data
+          cbind(
+              # Names of variables in model
+              rownames(as.data.frame(summary(fit)[["coefficients"]])),
+              # Coefficients in model
+              as.data.frame(summary(fit)[["coefficients"]])) %>%
+        # Rename variables
+        rename(se = `Std. Error`, var = `rownames(as.data.frame(summary(fit)[["coefficients"]]))`) %>% 
+        # Keep only drug of interest (second row)    
+        filter(row_number() != 1) %>%
+        # Create new variables
+        mutate(ll = exp(Estimate - (1.96 * se)),                                                         # Lower limit
+               ul = exp(Estimate + (1.96 * se)),                                                         # Upper limit
+               es = exp(Estimate),                                                                       # Odds ratio
+               result = paste0(format(round(es, digits = 2), nsmall = 2, scientific = FALSE), " (",      # Format results nicely
+                               format(round(ll, digits = 2), nsmall = 2, scientific = FALSE), "-",
+                               format(round(ul, digits = 2), nsmall = 2, scientific = FALSE), ")")) %>% 
+        # Keep only result
+        dplyr::select(var, es, ll, ul, result)
+    
+    # Finish data frame with drug name in front
+    dat.lor <- cbind(rep(drg, nrow(dat.lor)), dat.lor)
+    
+    # Return data
+    return(dat.lor)
+}
+
+# Function for Cox model for persistence
+fun.cox.prd <- function(df, drg, var){
+    # Define formula
+    form <- paste0("Surv(time2gap, gap_ind) ~ ", var)
+
+    # Get data
+    dat.model <- df
+    
+    # Fit model
+    fit <- coxph(as.formula(form), data = dat.model, robust = TRUE)
+        
+     # Calculate hazard ratio and confidence interval
+      dat.lor <- 
+          # Bind data
+          cbind(
+              # Names of variables in model
+              rownames(as.data.frame(summary(fit)[["coefficients"]])),
+              # Coefficients in model
+              format(round(
+                  # Bind model information
+                  cbind(
+                      # Coefficients
+                      summary(fit)[["coefficients"]], 
+                      # Confidence interval
+                      exp(confint(fit))), 
+                  2), nsmall = 2)) %>% 
+          # Change to data frame
+          as.data.frame() %>%
+          # Rename variables
+          rename(var = 1, es = 3, ll = 8, ul = 9) %>% 
+          # Calculate new variables
+          mutate(es = as.numeric(es),                                                                       # Hazard ratio 
+                 ll = as.numeric(ll),                                                                       # Lower limit
+                 ul = as.numeric(ul),                                                                       # Upper limit
+                 result = paste0(format(round(es, digits = 2), nsmall = 2, scientific = FALSE), " (",       # Format results nicely
+                                 format(round(ll, digits = 2), nsmall = 2, scientific = FALSE), "-",
+                                 format(round(ul, digits = 2), nsmall = 2, scientific = FALSE), ")")) %>% 
+          # Keep only result
+          dplyr::select(var, es, ll, ul, result)
+      
+    # Finish data frame with drug name in front   
+    dat.lor <- cbind(rep(drg, nrow(dat.lor)), dat.lor)
+    
+    # Return data
+    return(dat.lor)
+}
+
+### Function for running model for all variables
+fun.prd <- function(type, drg, addon){
+    # Get data of interest
+    dat.tmp <- filter(pop, drug == drg)
+    
+    # Remove the addon for variables of interest
+    dat.tmp <- rename(dat.tmp, pdc = paste0("pdc_", addon), pdc_ind = paste0("pdc_ind_", addon), 
+                      gap_ind = paste0("gap_ind_", addon), time2gap = paste0("time2gap_", addon))
+    
+    # Change year to factor
+    dat.tmp <- mutate(dat.tmp, year = factor(year, levels = c(2015:2020)))
+    
+    # Run models for adherence
+    if(type == "adherence"){
+        # Run model for each variable and rowbind
+        dat.mod <- do.call("rbind", lapply(c("mod_age", "female", "mod_gfr", "mod_hbc", "lab_acc", "com_acv", "com_hfl", "com_hyp",
+                                             "com_dmc", "med_met", "med_sus", "med_ins", "med_oad", "mod_nnd", "ses_edu", "ses_fam", 
+                                             "ses_inc", "year"), fun.log.prd, df = dat.tmp, drg = drg))
+    }
+    
+    # Run models for persistence
+    if(type == "persistence"){
+        # Run model for each variable and rowbind
+        dat.mod <- do.call("rbind", lapply(c("mod_age", "female", "mod_gfr", "mod_hbc", "lab_acc", "com_acv", "com_hfl", "com_hyp",
+                                             "com_dmc", "med_met", "med_sus", "med_ins", "med_oad", "mod_nnd", "ses_edu", "ses_fam", 
+                                             "ses_inc", "year"), fun.cox.prd, df = dat.tmp, drg = drg))
+    }
+
+    # Create data frame with variable names that can be joined to model data
+    vars <- 
+        # Create data frame
+        data.frame(
+            var = rownames(dat.mod), 
+            lab = c("Age per +10 years", "Women vs. men", "eGFR per 10 mL/min/1.73m2", "HbA1c per +10 mmol/mol", "ACR category A2 vs. A1",
+                    "ACR category A3 vs. A1", "ACR category missing vs. A1", "Atherosclerotic CVD", "Heart failure", "Hypertension", "DM complications", 
+                    "Metformin use", "SU use", "Insulin use", "Other DM medication use", "Number of non-diabetic drugs per +1 drug", 
+                    "Secondary vs. compulsory school", "University vs. compulsory school", "Missing education vs. compulsory school", 
+                    "Cohabitating vs. living alone", "Missing living status vs. living alone", "Income above vs. below stratum median",
+                    "Income missing vs. income belwo stratum median", "Initiation in 2016 vs. 2015", "Initiation in 2017 vs. 2015", 
+                    "Initiation in 2018 vs. 2015", "Initiation in 2019 vs. 2015", "Initiation in 2020 vs. 2015")
+        ) %>%
+        # Change lab to factor
+        mutate(lab = factor(lab, levels = c("Age per +10 years", "Women vs. men", "eGFR per 10 mL/min/1.73m2", "HbA1c per +10 mmol/mol", 
+                                            "ACR category A2 vs. A1", "ACR category A3 vs. A1", "ACR category missing vs. A1", "Atherosclerotic CVD", 
+                                            "Heart failure", "Hypertension", "DM complications", "Metformin use", "SU use", "Insulin use", 
+                                            "Other DM medication use", "Number of non-diabetic drugs per +1 drug", "Secondary vs. compulsory school", 
+                                            "University vs. compulsory school", "Missing education vs. compulsory school", 
+                                            "Cohabitating vs. living alone", "Missing living status vs. living alone", "Income above vs. below stratum median",
+                                            "Income missing vs. income belwo stratum median", "Initiation in 2016 vs. 2015", "Initiation in 2017 vs. 2015", 
+                                            "Initiation in 2018 vs. 2015", "Initiation in 2019 vs. 2015", "Initiation in 2020 vs. 2015")))
+    
+    # Finalize table
+    dat.tab <- dat.mod %>% 
+        # Join variable names
+        left_join(vars, "var") %>% 
+        # Remove model variable name
+        dplyr::select(-var) %>% 
+        # Remove spaces from result
+        mutate(result = gsub("- ", "-", result)) %>%
+        # Rename columns
+        rename(Drug = 1, `OR (95% CI)` = 5, `Prognostic factor` = 6)
+    
+    # If type is persistence, change OR to HR isntead
+    colnames(dat.tab)[5] <- ifelse(type == "persistence", "HR (95% CI)", "OR (95% CI)")
+    
+    # Return data    
+    return(dat.tab)
+}
+
+## Create tables
+# Adherence
+dat.adh <-
+    # SGLT2i
+    rbind(rep("sglt2i", 2), fun.prd("adherence", "sglt2i", "y1gp60")[, 6:5]) %>%
+    # Join GLP1-RA
+    left_join(rbind(rep("glp1", 2), fun.prd("adherence", "glp1", "y1gp60")[, 6:5]), "Prognostic factor") %>%
+    # Join DPP4i
+    left_join(rbind(rep("dpp4i", 2), fun.prd("adherence", "dpp4i", "y1gp60")[, 6:5]), "Prognostic factor")
+
+# Kable table
+kable(dat.adh, caption = "Univariable predictors for adherence - y1gp60")
+
+# Persistence
+dat.per <-
+    # SGLT2i
+    rbind(rep("sglt2i", 2), fun.prd("persistence", "sglt2i", "y1gp60")[, 6:5]) %>%
+    # Join GLP1-RA
+    left_join(rbind(rep("glp1", 2), fun.prd("persistence", "glp1", "y1gp60")[, 6:5]), "Prognostic factor") %>%
+    # Join DPP4i
+    left_join(rbind(rep("dpp4i", 2), fun.prd("persistence", "dpp4i", "y1gp60")[, 6:5]), "Prognostic factor")
+
+# Kable table
+kable(dat.per, caption = "Univariable predictors for persistence - y1gp60")
+
+```
+
+## 3.4. Analyses split over time (only proportions of each outcome)
+```{r}
+# Create function for proportions
+fun.prp <- function(drg, type, df){
+    # Get relevant variables
+    e <- get(paste0("e.", drg)); n <- get(paste0("n.", drg))
+    
+    # Get proportion
+    p <- e / n
+    
+    # Get standard error
+    se <- sqrt((p * (1 - p)) / n)
+    
+    # Get confidence interval
+    ll <- p - 1.96 * se; ul <- p + 1.96 * se
+    
+    # Put in table
+    dat.prp <- data.frame(drg = drg, es = p, ll = ll, ul = ul, typ = type, year = paste0(min(df[["year"]]), "-", max(df[["year"]])))
+    
+    # Return result
+    return(dat.prp)
+}
+
+# Create function to get numbers per outcome
+fun.n.out <- function(type, addon, df){
+    # Determine what variable holds the outcome
+    outcome_var <- ifelse(type == "adherence", "pdc_ind",
+                          ifelse(type == "persistence", "gap_ind", "res_ind"))
+    
+    # Get data
+    dat.tmp <- df
+    
+    #  Remove addon for variables of interest
+    dat.tmp <- rename(dat.tmp, pdc = paste0("pdc_", addon), pdc_ind = paste0("pdc_ind_", addon), 
+                      gap_ind = paste0("gap_ind_", addon), time2gap = paste0("time2gap_", addon),
+                      res_ind = paste0("res_ind_", addon))
+    
+    # Remove missings
+    dat.tmp <- dat.tmp[!is.na(dat.tmp[[outcome_var]]), ]
+    
+    ## Get total number for each drug
+    # SGLT2i
+    n.sglt2i <<- table(dat.tmp[["drug"]])[["sglt2i"]]
+    
+    # GLP1-RA
+    n.glp1 <<- table(dat.tmp[["drug"]])[["glp1"]]
+    
+    # DPP4i
+    n.dpp4i <<- table(dat.tmp[["drug"]])[["dpp4i"]]
+    
+    ## Get event count for each drug
+    # SGLT2i
+    e.sglt2i <<- table(filter(dat.tmp, drug == "sglt2i")[[outcome_var]])[["1"]]
+    
+    # GLP1-RA
+    e.glp1 <<- table(filter(dat.tmp, drug == "glp1")[[outcome_var]])[["1"]]
+    
+    # DPP4i
+    e.dpp4i <<- table(filter(dat.tmp, drug == "dpp4i")[[outcome_var]])[["1"]]
+    
+    ## Calculate proportions with confidence intervals
+    # SGLT2i
+    p.sglt2i <- fun.prp("sglt2i", type, df)
+    
+    # GLP1-RA
+    p.glp1 <- fun.prp("glp1", type, df)
+    
+    # DPP4i
+    p.dpp4i <- fun.prp("dpp4i", type, df)
+    
+    ## Combine data
+    dat.fin <- 
+        # Bind proportion data together
+        rbind(
+            # SGLT2i
+            p.sglt2i,
+            # GLP1-RA
+            p.glp1,
+            # DPP4i
+            p.dpp4i
+        )
+    
+    # Return final data
+    return(dat.fin)
+}
+    
+# Create function for plot
+fun.sa.plot <- function(addon, title){
+    # Combine data for each outcome for 2015-2017
+    dat.plot.15 <- do.call("rbind", lapply(c("adherence", "persistence", "restarting"), fun.n.out, addon = addon, df = filter(pop, year %in% c("2015", "2016", "2017"))))
+    
+    # Combine data for each outcome for 2018-2020
+    dat.plot.18 <- do.call("rbind", lapply(c("adherence", "persistence", "restarting"), fun.n.out, addon = addon, df = filter(pop, year %in% c("2018", "2019", "2020"))))
+  
+    # Combine data
+    dat.plot <-
+        # Bind data on rows
+        rbind(
+            # 2015-2017
+            dat.plot.15,
+            # 2018-2020
+            dat.plot.18
+        ) %>%
+        # Clean up column values
+        mutate(# Drug names
+               drg = case_when(drg == "sglt2i" ~ "SGLT2i",
+                               drg == "glp1" ~ "GLP1-RA",
+                               drg == "dpp4i" ~ "DPP4i"),
+               # Analysis type
+               typ = case_when(typ == "adherence" ~ "Low adherence",
+                               typ == "persistence" ~ "Non-persistence",
+                               typ == "restarting" ~ "Restart"),
+               # Set drg to factor
+               drg = factor(drg, levels = c("SGLT2i", "GLP1-RA", "DPP4i")),
+               # Set type to factor
+               typ = factor(typ, levels = c("Restart", "Non-persistence", "Low adherence"))) %>%
+        # Arrange data
+        arrange(typ, year, drg) %>%
+        # Rename year column for plot
+        rename(Period = year)
+    
+    
+    # Create plot
+    p <- ggplot(data = dat.plot, aes(x = es, xmin = ll, xmax = ul, y = typ, colour = Period)) +
+        # Geometries
+        geom_point(alpha = 0.9) +
+        geom_errorbar(width = 0.1, alpha = 0.9) +
+        # Scaling
+        scale_x_continuous(limits = c(0, 1)) +
+        scale_colour_manual(values = c("#0072B2", "#54EAC6")) +
+        # Transformations
+        facet_grid(cols = vars(drg)) +
+        # Labels
+        ggtitle(title) + xlab("Proportion (95% CI)") + ylab("") +
+        # Aesthetics
+        theme(panel.grid = element_blank(),
+              panel.grid.major.x = element_line(linetype = "dashed", colour = "lightgrey"),
+              panel.background = element_blank(),
+              plot.title = element_text(hjust = 0.5, face = "bold", size = 9),
+              strip.background = element_rect(colour = "black"),
+              legend.position = "bottom") +
+        panel_border(colour = "black", size = 0.5)
+    
+    # Return plot
+    return(p)
+}
+
+# Save plot
+ggsave("sa_time_y1gp60.png", plot = fun.sa.plot("y1gp60", "Outcomes in first 12 months for 2015-2017 and 2018-2020"), 
+       dpi = 600, width = 8, height = 3, path = "C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3")
+
+```
+
+# 4. 2 year & 60 day grace period
+## 4.1. Adherence and persistence
+### 4.1.1. Tables
+```{r}
+## Adherence
+# Create table
+tab.adh <- fun.tab("adherence", "y2gp60")
+
+# Kable table
+kable(tab.adh, caption = "Adherence in the first 24 months")              
+
+## Persistence
+# Create table
+tab.per <- fun.tab("persistence", "y2gp60")
+
+# Kable table
+kable(tab.per, caption = "Persistence in the first 24 months")              
+
+```
+
+### 4.1.2. Cumulative incidence function
+```{r}
+# Create plot
+ggsave("cif_y2gp60.jpg", plot = fun.cif("y2gp60", "Non-persistence within 24 months after initiation", zoom = FALSE), 
+       path = "C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3/", width = 9, height = 5, dpi = 600)
+
+```
+
+### 4.1.3. Adherence histograms
+```{r} 
+# Create and save plot
+ggsave("his_y2gp60.jpg", plot = fun.his("y2gp60", "Proportion of days covered within 24 months after initiation"), 
+       path = "C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3/", width = 9, height = 5, dpi = 600)
+
+```
+
+## 4.2. Restarting
+```{r}
+# Create table
+tab.adh <- fun.tab.res("y2gp60")
+
+# Kable table
+kable(tab.adh, caption = "Restarting within 3 months after non-persistence")              
+
+```
+
+## 4.3. Prognostic factors
+```{r}
+## Create tables
+# Adherence
+dat.adh <-
+    # SGLT2i
+    rbind(rep("sglt2i", 2), fun.prd("adherence", "sglt2i", "y2gp60")[, 6:5]) %>%
+    # Join GLP1-RA
+    left_join(rbind(rep("glp1", 2), fun.prd("adherence", "glp1", "y2gp60")[, 6:5]), "Prognostic factor") %>%
+    # Join DPP4i
+    left_join(rbind(rep("dpp4i", 2), fun.prd("adherence", "dpp4i", "y2gp60")[, 6:5]), "Prognostic factor")
+
+# Kable table
+kable(dat.adh, caption = "Univariable predictors for adherence - y2gp60")
+
+# Persistence
+dat.per <-
+    # SGLT2i
+    rbind(rep("sglt2i", 2), fun.prd("persistence", "sglt2i", "y2gp60")[, 6:5]) %>%
+    # Join GLP1-RA
+    left_join(rbind(rep("glp1", 2), fun.prd("persistence", "glp1", "y2gp60")[, 6:5]), "Prognostic factor") %>%
+    # Join DPP4i
+    left_join(rbind(rep("dpp4i", 2), fun.prd("persistence", "dpp4i", "y2gp60")[, 6:5]), "Prognostic factor")
+
+# Kable table
+kable(dat.per, caption = "Univariable predictors for persistence - y2gp60")
+
+```
+
+## 4.4. Analyses split over time (only proportions of each outcome)
+```{r}
+# Save plot
+ggsave("sa_time_y2gp60.png", plot = fun.sa.plot("y2gp60", "Outcomes in first 24 months for 2015-2017 and 2018-2020"), 
+       dpi = 600, width = 8, height = 3, path = "C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3")
+
+```
+
+# 5. No time limit & 60 day grace period
+## 5.1. Adherence and persistence
+### 5.1.1. Tables
+```{r}
+## Adherence
+# Create table
+tab.adh <- fun.tab("adherence", "yigp60")
+
+# Kable table
+kable(tab.adh, caption = "Adherence until end of follow-up")              
+
+## Persistence
+# Create table
+tab.per <- fun.tab("persistence", "yigp60")
+
+# Kable table
+kable(tab.per, caption = "Persistence until end of follow-up")              
+
+```
+
+### 5.1.2. Cumulative incidence function
+```{r}
+# Create plot
+ggsave("cif_yigp60.jpg", plot = fun.cif("yigp60", "Non-persistence after initiation until end of follow-up", zoom = FALSE), 
+       path = "C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3/", width = 9, height = 5, dpi = 600)
+
+```
+
+### 5.1.3. Adherence histograms
+```{r histogram} 
+# Create and save plot
+ggsave("his_yigp60.jpg", plot = fun.his("yigp60", "Proportion of days covered after initiation until end of follow-up"), 
+       path = "C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3/", width = 9, height = 5, dpi = 600)
+
+```
+
+## 5.2. Restarting
+```{r}
+# Create table
+tab.adh <- fun.tab.res("yigp60")
+
+# Kable table
+kable(tab.adh, caption = "Restarting within 3 months after non-persistence")              
+
+```
+
+## 5.3. Prognostic factors
+```{r}
+## Create tables
+# Adherence
+dat.adh <-
+    # SGLT2i
+    rbind(rep("sglt2i", 2), fun.prd("adherence", "sglt2i", "yigp60")[, 6:5]) %>%
+    # Join GLP1-RA
+    left_join(rbind(rep("glp1", 2), fun.prd("adherence", "glp1", "yigp60")[, 6:5]), "Prognostic factor") %>%
+    # Join DPP4i
+    left_join(rbind(rep("dpp4i", 2), fun.prd("adherence", "dpp4i", "yigp60")[, 6:5]), "Prognostic factor")
+
+# Kable table
+kable(dat.adh, caption = "Univariable predictors for adherence - yigp60")
+
+# Persistence
+dat.per <-
+    # SGLT2i
+    rbind(rep("sglt2i", 2), fun.prd("persistence", "sglt2i", "yigp60")[, 6:5]) %>%
+    # Join GLP1-RA
+    left_join(rbind(rep("glp1", 2), fun.prd("persistence", "glp1", "yigp60")[, 6:5]), "Prognostic factor") %>%
+    # Join DPP4i
+    left_join(rbind(rep("dpp4i", 2), fun.prd("persistence", "dpp4i", "yigp60")[, 6:5]), "Prognostic factor")
+
+# Kable table
+kable(dat.per, caption = "Univariable predictors for persistence - yigp60")
+
+```
+
+## 5.4. Analyses split over time (only proportions of each outcome)
+```{r}
+# Save plot
+ggsave("sa_time_yigp60.png", plot = fun.sa.plot("yigp60", "Outcomes until end of follow-up for 2015-2017 and 2018-2020"), 
+       dpi = 600, width = 8, height = 3, path = "C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3")
+
+```
+
+# 6. 1 year & 30 day grace period
+## 6.1. Persistence
+### 6.1.1. Tables
+```{r}
+## Persistence
+# Create table
+tab.per <- fun.tab("persistence", "y1gp30")
+
+# Kable table
+kable(tab.per, caption = "Persistence until end of follow-up")              
+
+```
+
+### 6.1.2. Cumulative incidence function
+```{r}
+# Create plot
+ggsave("cif_y1gp30.jpg", plot = fun.cif("y1gp30", "Non-persistence within 12 months after initiation with a 30 day grace period",
+                                        zoom = FALSE), 
+       path = "C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3/", width = 9, height = 5, dpi = 600)
+
+```
+
+## 6.2. Restarting
+```{r}
+# Create table
+tab.adh <- fun.tab.res("y1gp30")
+
+# Kable table
+kable(tab.adh, caption = "Restarting within 3 months after non-persistence")              
+
+```
+
+## 6.3. Prognostic factors
+```{r}
+## Create tables
+# Persistence
+dat.per <-
+    # SGLT2i
+    rbind(rep("sglt2i", 2), fun.prd("persistence", "sglt2i", "y1gp30")[, 6:5]) %>%
+    # Join GLP1-RA
+    left_join(rbind(rep("glp1", 2), fun.prd("persistence", "glp1", "y1gp30")[, 6:5]), "Prognostic factor") %>%
+    # Join DPP4i
+    left_join(rbind(rep("dpp4i", 2), fun.prd("persistence", "dpp4i", "y1gp30")[, 6:5]), "Prognostic factor")
+
+# Kable table
+kable(dat.per, caption = "Univariable predictors for persistence - y1gp30")
+
+```
+
+## 6.4. Analyses split over time (only proportions of each outcome)
+```{r}
+# Save plot
+ggsave("sa_time_y1gp30.png", plot = fun.sa.plot("y1gp30", "Outcomes in first 12 months with a 30 day grace period for 2015-2017 and 2018-2020"), 
+       dpi = 600, width = 8, height = 3, path = "C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3")
+
+```
+
+# 7. Adherence in periods until end of follow-up
+```{r eval=FALSE, include=FALSE}
+# Load data
+load("dataframes/ap.Rdata")
+
+# Create plot of mean
+p <- ggplot(data = dat.adh.period, aes(x = period, y = mean_pdc, ymin = ll, ymax = ul, colour = drug)) +
+    # Geometries
+    geom_point(stat = "identity") +
+    geom_errorbar(width = 0.1) +
+    # Scalings
+    scale_colour_manual(values = c("#0072B2", "#54EAC6", "#D55E00")) +
+    scale_x_continuous(limits = c(0.9, 28.1), breaks = 1:28, labels = paste0(seq(1, 82, 3), "-", seq(3, 85, 3)), expand = expansion(add = 0.5)) +
+    scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 20), labels = paste0(seq(0, 100, 20), "%")) +
+    # Transformations
+    facet_wrap(facets = vars(factor(drug, levels = c("sglt2i", "glp1", "dpp4i"))), labeller = as_labeller(c("sglt2i" = "SGLT2i", "glp1" = "GLP1-RA", "dpp4i" = "DPP4i")),
+               ncol = 1) +
+    coord_cartesian(xlim = c(1, 28)) +
+    # Labels
+    guides(colour = "none") + xlab("Months") + ylab("PDC") +
+    ggtitle("Mean proportion of days covered per 3 month period") +
+    # Aesthetics
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          panel.background = element_blank(),
+          panel.grid = element_blank(),
+          panel.grid.major.y = element_line(linetype = "dashed", colour = "grey"),
+          strip.background = element_rect(colour = "black"),
+          axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+    panel_border(colour = "black", size = 0.5)
+
+# Save plot
+ggsave("ap.png", plot = p, dpi = 600, width = 10, height = 6, path = "C:/C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3")
+
+# Create plot of proportions
+p <- ggplot(data = dat.adh.period, aes(x = period, y = prop_low_pdc, fill = drug)) +
+    # Geometries
+    geom_bar(stat = "identity") +
+    # Scalings
+    scale_fill_manual(values = c("#0072B2", "#54EAC6", "#D55E00")) +
+    scale_x_continuous(limits = c(0, 29), breaks = 1:28, labels = paste0(seq(1, 82, 3), "-", seq(3, 85, 3)), expand = expansion(add = 0.5)) +
+    scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 20), labels = paste0(seq(0, 100, 20), "%")) +
+    # Transformations
+    facet_wrap(facets = vars(factor(drug, levels = c("sglt2i", "glp1", "dpp4i"))), labeller = as_labeller(c("sglt2i" = "SGLT2i", "glp1" = "GLP1-RA", "dpp4i" = "DPP4i")),
+               ncol = 1) +
+    coord_cartesian(xlim = c(0.5, 28.5)) +
+    # Labels
+    guides(fill = "none") + xlab("Months") + ylab("Proportion of participants with low PDC per 3 month period") +
+    ggtitle("Proportion of participants with PDC <80%") +
+    # Aesthetics
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          panel.background = element_blank(),
+          panel.grid = element_blank(),
+          panel.grid.major.y = element_line(linetype = "dashed", colour = "grey"),
+          strip.background = element_rect(colour = "black"),
+          axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+    panel_border(colour = "black", size = 0.5)    
+
+# Save plot
+ggsave("ap_prop.png", plot = p, dpi = 600, width = 10, height = 6, path = "C:/C:/Users/rjjanse/OneDrive - LUMC/Research/Projects/8. GDT_SGLT2i/Figures/SCREAM3")
+
+
+```
