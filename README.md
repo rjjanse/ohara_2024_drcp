@@ -39,7 +39,8 @@ The following data-specific variable names are used in the code and mean the fol
 The  diagrams shown below give an explanation of how the code works, with on the left a text-based explanation and on the right a visual example.
 
 ### Adherence
-![Adherence function](https://github.com/user-attachments/assets/714ce53e-1aa5-47ac-87f3-49ad158eda41)
+![Adherence function](https://github.com/user-attachments/assets/d91fb74e-530d-4d65-b140-d44d2603e3eb)
 
 ### Persistence
-![Persistence function](https://github.com/user-attachments/assets/3139e49f-4496-44e8-8b76-e2cb61fa7ade)
+![Persistence function](https://github.com/user-attachments/assets/fbbe4b1b-ca3c-4e41-8d9f-f614cb97186b)
+
